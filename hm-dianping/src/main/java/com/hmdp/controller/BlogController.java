@@ -1,6 +1,7 @@
 package com.hmdp.controller;
 
 
+import cn.hutool.core.util.BooleanUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -10,6 +11,7 @@ import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -25,6 +27,9 @@ public class BlogController {
     @Resource
     private IUserService userService;
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
         // 获取登录用户
@@ -39,9 +44,8 @@ public class BlogController {
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
         // 修改点赞数量
-        blogService.update()
-                .setSql("liked = liked + 1").eq("id", id).update();
-        return Result.ok();
+
+        return blogService.isLike(id);
     }
 
     @GetMapping("/of/me")
@@ -70,7 +74,21 @@ public class BlogController {
             User user = userService.getById(userId);
             blog.setName(user.getNickName());
             blog.setIcon(user.getIcon());
+            // 判断是否点过赞
+            String key = "blog:islike" + blog.getId();
+            Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
+            blog.setIsLike(score != null);
         });
         return Result.ok(records);
+    }
+
+    @GetMapping("/{id}")
+    public Result queryBlog(@PathVariable("id") Long id) {
+        return blogService.queryByid(id);
+    }
+
+    @GetMapping("/likes/{id}")
+    public Result queryisLikeRange(@PathVariable("id") Long id) {
+        return blogService.queryisLikeRange(id);
     }
 }
